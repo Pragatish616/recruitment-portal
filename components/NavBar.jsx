@@ -37,7 +37,7 @@ const NavBar = () => {
           >
             R
           </span>
-          <span className="font-heading">Recruitment Portal</span>
+          <span className="hidden font-heading sm:inline">Recruitment Portal</span>
         </Link>
 
         <div className="hidden items-center gap-1 md:flex">
@@ -52,8 +52,8 @@ const NavBar = () => {
           ))}
         </div>
 
-        <div className="hidden shrink-0 items-center gap-1 text-xs text-muted-foreground lg:flex">
-          <span>Applications close in</span>
+        <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+          <span className="hidden sm:inline">Applications close in</span>
           <CountdownTimer targetDate={APPLICATION_DEADLINE} compact />
         </div>
 
