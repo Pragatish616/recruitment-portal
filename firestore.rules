@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // This app never talks to Firestore from the browser: every read/write goes
+    // through Next.js server routes using the Admin SDK, which bypasses these
+    // rules entirely. The previous "allow read, write: if true" therefore did
+    // nothing to protect the app itself, but it left every applicant record
+    // (name, email, registration number, phone, question answers) readable and
+    // writable by anyone on the internet who calls the public Firestore REST/
+    // gRPC API directly with this project's id, with no authentication at all.
+    // Deny by default so the database has no exposed surface beyond the
+    // server-authenticated API routes.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

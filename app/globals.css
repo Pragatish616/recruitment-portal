@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * shadcn/ui (components.json: baseColor "slate", cssVariables: true) expects
+ * these tokens to exist -- tailwind.config.js already maps every utility
+ * class (bg-background, border-input, text-muted-foreground, ...) to
+ * hsl(var(--...)), but the variables themselves were never defined here, so
+ * every ui/* component was rendering with unresolved colors. Slate neutrals
+ * per the documented base color; one locked accent (emerald) layered on top
+ * per the project's single-accent rule, tuned separately for light and dark
+ * so button/focus contrast holds at WCAG AA in both.
+ */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 162 94% 24%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 40%;
+
+    --accent: 162 60% 94%;
+    --accent-foreground: 162 94% 20%;
+
+    --destructive: 0 72% 42%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 89%;
+    --input: 214.3 31.8% 89%;
+    --ring: 162 84% 30%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222.2 47% 6%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 40% 8.5%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 40% 8%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 160 84% 45%;
+    --primary-foreground: 160 84% 8%;
+
+    --secondary: 217.2 26% 16%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 26% 16%;
+    --muted-foreground: 215 20% 68%;
+
+    --accent: 160 40% 16%;
+    --accent-foreground: 150 60% 80%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 26% 18%;
+    --input: 217.2 26% 18%;
+    --ring: 160 84% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    margin: 0;
+    padding: 0;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading tracking-tight;
+  }
+
+  /* Browser-drawn surfaces (selection, focus, scrollbar) left the palette
+     unstated; theming them is the cheapest signal a page was designed on
+     purpose rather than left at browser defaults. */
+  ::selection {
+    background-color: hsl(var(--primary) / 0.28);
+    color: hsl(var(--foreground));
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 9999px;
+    border: 2px solid hsl(var(--background));
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
