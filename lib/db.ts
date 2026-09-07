@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore, Firestore } from "firebase-admin/firestore";
 
@@ -48,11 +49,11 @@ export const connect = async (): Promise<Firestore> => {
   return cached.db;
 };
 
-// Deterministic, URL/Firestore-safe key derived from free-text (an email or a
-// department name). Used to build stable document IDs so that "has this user
-// already applied to this department" is a single doc.get() instead of a
-// collection query, and so a duplicate submission collides on the same
-// document instead of silently creating a second one.
+// Deterministic, URL/Firestore-safe key derived from a free-text department
+// name. Used to build stable document IDs so that "has this user already
+// applied to this department" is a single doc.get() instead of a collection
+// query, and so a duplicate submission collides on the same document instead
+// of silently creating a second one.
 export const slugifyForId = (value: string): string =>
   (value || "")
     .trim()
@@ -63,10 +64,18 @@ export const slugifyForId = (value: string): string =>
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "") || "unknown";
 
-export const applicantIndexId = (email: string): string => slugifyForId(email);
+// Emails are not slugified for their id component: collapsing punctuation to
+// "-" would let two distinct real addresses (e.g. "a.b@x.com" and
+// "a-b@x.com") collide onto the same document, letting one applicant's
+// submission corrupt or block another's. A hash of the normalized (trimmed,
+// lowercased) email has no such collisions in practice.
+const hashForId = (value: string): string =>
+  createHash("sha256").update((value || "").trim().toLowerCase()).digest("hex");
+
+export const applicantIndexId = (email: string): string => hashForId(email);
 
 export const applicationDocId = (email: string, department: string): string =>
-  `${slugifyForId(email)}__${slugifyForId(department)}`;
+  `${hashForId(email)}__${slugifyForId(department)}`;
 
 export const serializeFirestoreData = (value: any): any => {
   if (value === null || value === undefined) return value;

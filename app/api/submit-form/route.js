@@ -2,7 +2,9 @@ import { connect, applicantIndexId, applicationDocId } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { FieldValue } from "firebase-admin/firestore";
-import { APPLICATION_DEADLINE } from "@/constants";
+import { APPLICATION_DEADLINE, reviews } from "@/constants";
+
+const VALID_DEPARTMENTS = new Set(reviews.map((department) => department.name));
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +40,13 @@ export async function POST(req) {
     if (!Department || typeof Department !== "string") {
       return new Response(
         JSON.stringify({ message: "A department is required" }),
+        { status: 400 }
+      );
+    }
+
+    if (!VALID_DEPARTMENTS.has(Department)) {
+      return new Response(
+        JSON.stringify({ message: "Unknown department" }),
         { status: 400 }
       );
     }
