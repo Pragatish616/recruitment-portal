@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { reviews } from "@/constants";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useSubmissions } from "@/components/SubmissionsProvider";
 
@@ -19,7 +20,7 @@ const nonTechnicalDepartments = departments.filter((d) => d.category === "non-te
 
 const DepartmentsListPage = () => {
   const router = useRouter();
-  const { submittedDepartments } = useSubmissions();
+  const { submittedDepartments, isLoadingSubmissions } = useSubmissions();
   const [selectedDepartments, setSelectedDepartments] = useState([]);
 
   const remainingSlots = Math.max(0, MAX_SELECTION - submittedDepartments.length);
@@ -99,6 +100,7 @@ const DepartmentsListPage = () => {
             submittedDepartments={submittedDepartments}
             remainingSlots={remainingSlots}
             onToggle={toggleDepartment}
+            isLoading={isLoadingSubmissions}
           />
           <DepartmentGroup
             label="Non-technical departments"
@@ -107,6 +109,7 @@ const DepartmentsListPage = () => {
             submittedDepartments={submittedDepartments}
             remainingSlots={remainingSlots}
             onToggle={toggleDepartment}
+            isLoading={isLoadingSubmissions}
           />
         </div>
       </div>
@@ -123,8 +126,39 @@ const DepartmentGroup = ({
   submittedDepartments,
   remainingSlots,
   onToggle,
+  isLoading,
 }) => {
   if (!departments.length) return null;
+
+  // Whether a department is already-submitted/disabled depends on
+  // submittedDepartments, which is still in flight on a fresh session (no
+  // sessionStorage cache yet — see SubmissionsProvider). Without this,
+  // every card would briefly render as "available" and then jump to
+  // "Already submitted" a moment later once the check resolves.
+  if (isLoading) {
+    return (
+      <section>
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {label}
+        </h2>
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {departments.map((department) => (
+            <li key={department.id} className="flex h-full flex-col gap-4 rounded-xl border border-border bg-card p-5">
+              <div className="flex items-start justify-between gap-3">
+                <Skeleton className="h-10 w-10 rounded-lg" />
+                <Skeleton className="h-6 w-6 rounded-full" />
+              </div>
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-4/5" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
 
   return (
     <section>

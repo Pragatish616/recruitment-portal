@@ -10,6 +10,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 // ThemeToggle Component
 export default function ThemeToggle() {
@@ -17,13 +18,18 @@ export default function ThemeToggle() {
 
     return (
         <DropdownMenu className="cursor-pointer">
-            <DropdownMenuTrigger asChild>
-                <Button className="cursor-pointer rounded-full" variant="outline" size="icon">
-                    <Sun className="h-[1rem] w-[1rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                    <Moon className="absolute h-[1rem] w-[1rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                    <span className="sr-only">Toggle theme</span>
-                </Button>
-            </DropdownMenuTrigger>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                        <Button className="cursor-pointer rounded-full" variant="outline" size="icon">
+                            <Sun className="h-[1rem] w-[1rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                            <Moon className="absolute h-[1rem] w-[1rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                            <span className="sr-only">Toggle theme</span>
+                        </Button>
+                    </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Toggle theme</TooltipContent>
+            </Tooltip>
             <DropdownMenuContent align="end">
                 <DropdownMenuItem className="cursor-pointer" onClick={() => setTheme("light")}>
                     Light

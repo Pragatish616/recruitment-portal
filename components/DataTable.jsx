@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import {
   Table,
@@ -15,9 +15,12 @@ import { FaSortAmountDownAlt } from "react-icons/fa";
 import { GrPowerReset } from "react-icons/gr";
 import { Button } from "./ui/button";
 import { CheckBoxComp } from "./CheckBoxComp";
+import { Skeleton } from "./ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { toast } from "sonner";
 import { curDate, curMonth, curYear, months } from "@/constants";
 import { IoCloudDownloadOutline } from "react-icons/io5";
+import { RefreshCw } from "lucide-react";
 import {
   useTable,
   useSortBy,
@@ -49,33 +52,38 @@ const MailComposer = dynamic(() => import("./MailComposer"), {
 });
 
 const DataTable = ({ data }) => {
-  const [tableData, setTableData] = useState(data);
+  // baseData is this component's single source of truth for applicant
+  // records (initially the server-rendered list, replaceable by Refresh
+  // below or by an optimistic shortlist toggle). tableData is always
+  // *derived* from it plus whatever filters are active - previously this
+  // was tracked as separate state kept in sync by a useEffect that detected
+  // "is a filter active" via `deptFiltered !== data` reference-equality.
+  // That broke the moment the underlying array needed to change for any
+  // other reason (an optimistic update, a refresh): the filter state's
+  // stale reference would suddenly look "active" against the new array
+  // even though the user never touched a filter, silently reverting the
+  // table to old filtered data. Deriving tableData with useMemo from
+  // explicit filter values removes that whole class of bug.
+  const [baseData, setBaseData] = useState(data);
+  const [deptFilterValue, setDeptFilterValue] = useState("");
+  const [shortFilterValue, setShortFilterValue] = useState("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  // FilterDepartment/FilterShortlisted each keep their own "currently
+  // selected" label internally. A full window.location.reload() used to
+  // wipe that along with everything else, which is the only reason the
+  // old reset button never looked broken. Bumping this and passing it down
+  // as a resetKey tells them to clear their own displayed selection too.
+  const [filterResetKey, setFilterResetKey] = useState(0);
 
-  const [deptFiltered, setDeptFiltered] = useState(data);
-  const [shortFiltered, setShortFiltered] = useState(data);
+  const filterFunc = (dept) => setDeptFilterValue(dept);
+  const shortlistedFilterFunc = (status) => setShortFilterValue(status);
 
-  const filterFunc = (dept) => {
-    const filteredData = data.filter((row) => row.Department === dept);
-    setDeptFiltered(filteredData);
-  };
-
-  const shortlistedFilterFunc = (status) => {
-    const filteredData = data.filter((row) => String(row.shortlisted) === status);
-    setShortFiltered(filteredData);
-  };
-
-  useEffect(() => {
-    if (deptFiltered !== data && shortFiltered !== data) {
-      const shortIds = new Set(shortFiltered.map((row) => row._id));
-      setTableData(deptFiltered.filter((row) => shortIds.has(row._id)));
-    } else if (deptFiltered !== data && shortFiltered === data) {
-      setTableData(deptFiltered);
-    } else if (deptFiltered === data && shortFiltered !== data) {
-      setTableData(shortFiltered);
-    } else {
-      setTableData(data);
-    }
-  }, [data, deptFiltered, shortFiltered]);
+  const tableData = useMemo(() => {
+    let result = baseData;
+    if (deptFilterValue) result = result.filter((row) => row.Department === deptFilterValue);
+    if (shortFilterValue) result = result.filter((row) => String(row.shortlisted) === shortFilterValue);
+    return result;
+  }, [baseData, deptFilterValue, shortFilterValue]);
 
   const applicantTotalCount = tableData.length;
   const shortlistedApplicantCount = useMemo(
@@ -83,7 +91,18 @@ const DataTable = ({ data }) => {
     [tableData]
   );
 
+  // Optimistic: flip the row immediately so the admin sees an instant
+  // response (both here and in the "View Responses" dialog, which now
+  // shares this same handler instead of keeping its own separate copy of
+  // shortlisted status), then roll back with a toast if the server
+  // actually rejects it.
   const handleShortlist = async (id, isShortlisted) => {
+    setBaseData((prev) =>
+      prev.map((applicant) =>
+        applicant._id === id ? { ...applicant, shortlisted: !isShortlisted } : applicant
+      )
+    );
+
     try {
       const res = await fetch(`/api/shortlist/${id}`, {
         method: "PATCH",
@@ -91,19 +110,44 @@ const DataTable = ({ data }) => {
         body: JSON.stringify({ shortlisted: !isShortlisted }),
       });
 
-      if (res.ok) {
-        const updatedData = tableData.map((applicant) =>
-          applicant._id === id ? { ...applicant, shortlisted: !isShortlisted } : applicant
-        );
-        setTableData(updatedData);
-        toast.success("Student status updated!");
-      } else {
-        console.error("Failed to update applicant status.");
-        throw new Error("Failed to update");
-      }
+      if (!res.ok) throw new Error("Failed to update");
+      toast.success("Student status updated!");
     } catch (error) {
+      setBaseData((prev) =>
+        prev.map((applicant) =>
+          applicant._id === id ? { ...applicant, shortlisted: isShortlisted } : applicant
+        )
+      );
       console.error("Error occurred while updating the status:", error.message);
       toast.error("Failed to update status");
+    }
+  };
+
+  const handleResetFilters = () => {
+    setDeptFilterValue("");
+    setShortFilterValue("");
+    setGlobalFilter("");
+    setFilterResetKey((key) => key + 1);
+  };
+
+  // /api/admin/applicants already existed (server-gated the same way the
+  // page itself is) but nothing ever called it - the only way to see fresh
+  // data was a full window.location.reload(). This wires it up as an
+  // actual client-side refetch instead, so refreshing doesn't blank the
+  // whole page or lose your current filters/pagination.
+  const handleRefreshData = async () => {
+    setIsRefreshing(true);
+    try {
+      const res = await fetch("/api/admin/applicants");
+      const json = await res.json();
+      if (!res.ok || !Array.isArray(json.applicants)) throw new Error("Failed to refresh");
+      setBaseData(json.applicants);
+      toast.success("Applicant list refreshed");
+    } catch (error) {
+      console.error("Failed to refresh applicants:", error);
+      toast.error("Failed to refresh data");
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -307,23 +351,47 @@ const DataTable = ({ data }) => {
           onChange={(e) => handlePageSize(e)}
           placeholder={"Page Size"}
         />
-        <FilterDepartment filterFunc={filterFunc} />
-        <FilterShortlisted filterFunc={shortlistedFilterFunc} />
-        <DialogComp selectedApplicants={showRowData} />
+        <FilterDepartment filterFunc={filterFunc} resetKey={filterResetKey} />
+        <FilterShortlisted filterFunc={shortlistedFilterFunc} resetKey={filterResetKey} />
+        <DialogComp selectedApplicants={showRowData} handleShortlist={handleShortlist} />
         <MailComposer recipients={selectedFlatRows.length} handleRowSelection={handleRowSelection} />
-        <Button onClick={() => window.location.reload()} className="flex gap-2">
-          <GrPowerReset />
-          Reset Filters
-        </Button>
-        <Button>
-          <CSVLink
-            {...csv_link}
-            className="flex gap-2 justify-center items-center"
-          >
-            <IoCloudDownloadOutline />
-            Download CSV
-          </CSVLink>
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button onClick={handleResetFilters} className="flex gap-2">
+              <GrPowerReset />
+              Reset Filters
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Clears search, department, and shortlisted filters</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              onClick={handleRefreshData}
+              disabled={isRefreshing}
+              variant="outline"
+              className="flex gap-2"
+            >
+              <RefreshCw className={isRefreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} aria-hidden="true" />
+              {isRefreshing ? "Refreshing..." : "Refresh"}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Reload the applicant list from the server</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button>
+              <CSVLink
+                {...csv_link}
+                className="flex gap-2 justify-center items-center"
+              >
+                <IoCloudDownloadOutline />
+                Download CSV
+              </CSVLink>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Export every applicant currently in the table (respects active filters)</TooltipContent>
+        </Tooltip>
       </div>
 
       <div className="rounded-md border border-border">
@@ -346,18 +414,28 @@ const DataTable = ({ data }) => {
             ))}
           </TableHeader>
           <TableBody {...getTableBodyProps()}>
-            {page.map((row) => {
-              prepareRow(row);
-              return (
-                <TableRow key={row.id} {...row.getRowProps()}>
-                  {row.cells.map((cell) => (
-                    <TableCell key={cell.column.id} {...cell.getCellProps()}>
-                      {cell.render("Cell")}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              );
-            })}
+            {isRefreshing
+              ? Array.from({ length: Math.min(page.length || 5, 8) }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    {(headerGroups[0]?.headers || []).map((header) => (
+                      <TableCell key={header.id}>
+                        <Skeleton className="h-4 w-full max-w-[140px]" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              : page.map((row) => {
+                  prepareRow(row);
+                  return (
+                    <TableRow key={row.id} {...row.getRowProps()}>
+                      {row.cells.map((cell) => (
+                        <TableCell key={cell.column.id} {...cell.getCellProps()}>
+                          {cell.render("Cell")}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })}
           </TableBody>
         </Table>
       </div>

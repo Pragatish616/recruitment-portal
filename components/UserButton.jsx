@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { LayoutDashboard, LogOut } from "lucide-react";
 
 export default function UserButton({ user, isAdmin }) {
@@ -31,14 +32,19 @@ export default function UserButton({ user, isAdmin }) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="cursor-pointer rounded-full ring-offset-background transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-        <Avatar className="h-9 w-9 border border-border">
-          <AvatarImage src={user.image || undefined} alt={user.name || user.email} />
-          <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
-            {getInitials()}
-          </AvatarFallback>
-        </Avatar>
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger className="cursor-pointer rounded-full ring-offset-background transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+            <Avatar className="h-9 w-9 border border-border">
+              <AvatarImage src={user.image || undefined} alt={user.name || user.email} />
+              <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
+                {getInitials()}
+              </AvatarFallback>
+            </Avatar>
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent>{user.name || user.email}</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="flex flex-col">
           <span className="truncate text-sm font-medium">{user.name || "Applicant"}</span>

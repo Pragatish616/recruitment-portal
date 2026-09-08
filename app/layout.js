@@ -3,6 +3,7 @@ import { Space_Grotesk, DM_Sans } from "next/font/google";
 // Providers
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { SubmissionsProvider } from "@/components/SubmissionsProvider";
 // Styling
 import "./globals.css";
@@ -35,10 +36,12 @@ export default function RootLayout({ children }) {
     >
       <body>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <SubmissionsProvider>
-            {children}
-            <Toaster />
-          </SubmissionsProvider>
+          <TooltipProvider delayDuration={200}>
+            <SubmissionsProvider>
+              {children}
+              <Toaster />
+            </SubmissionsProvider>
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -31,9 +31,13 @@ let frameworks = [
     },
 ];
 
-export default function FilterShortlisted({ filterFunc }) {
+export default function FilterShortlisted({ filterFunc, resetKey }) {
     const [open, setOpen] = React.useState(false);
     const [value, setValue] = React.useState("");
+
+    React.useEffect(() => {
+        if (resetKey !== undefined) setValue("");
+    }, [resetKey]);
 
     return (
         <Popover open={open} onOpenChange={setOpen}>

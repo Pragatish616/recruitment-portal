@@ -42,7 +42,6 @@ const linkifyText = (text) => {
 export default function CarouselComp({
     dataList,
     handleShortlist,
-    shortlistStatus,
 }) {
     const getQuestions = (data) => {
         if (!data?.Questions) return [];
@@ -107,14 +106,14 @@ export default function CarouselComp({
                                             )}
                                         </div>
                                         <Button
-                                            onClick={() => handleShortlist(index)}
+                                            onClick={() => handleShortlist(data._id, data.shortlisted)}
                                             className={`text-white rounded-md mt-4 shrink-0 ${
-                                                shortlistStatus[index]
+                                                data.shortlisted
                                                     ? "bg-red-600 hover:bg-red-700"
                                                     : "bg-green-600 hover:bg-green-700"
                                             }`}
                                         >
-                                            {shortlistStatus[index]
+                                            {data.shortlisted
                                                 ? "Unshortlist Applicant"
                                                 : "Shortlist Applicant"}
                                         </Button>

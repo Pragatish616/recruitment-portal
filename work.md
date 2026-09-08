@@ -131,7 +131,38 @@ A second, deeper pass beyond §6, run right before the submission deadline: a fu
 
 **Branding:** replaced the placeholder "R" letter mark in the navbar (`NavBar.jsx`) with the actual organization logo (`public/assets/gdg-logo.png`), rendered via `next/image` (auto-optimized, served at 28×28 — verified locally that the optimized endpoint returns a valid ~3KB PNG and every route still renders correctly under it).
 
-## 12. Recommended next improvements (post-deadline, prioritized)
+**Confirmed working:** the user tested the "Send Mail" flow after the fixes above and after correcting the Gmail App Password in Vercel's environment variables — a real email was sent successfully end to end.
+
+## 12. Round 4: caching, skeleton loaders, optimistic UI, and tooltips (2026-09-08)
+
+The user asked for these four UX/perf patterns to be audited across the app and implemented wherever missing. Findings and changes below; every item was verified against a clean `next build` and a local `next start` route sweep before being committed.
+
+**Caching — audited, one real gap, one real gap closed:**
+- Already present and working correctly: `SubmissionsProvider.jsx` caches a signed-in user's submitted-department list in `sessionStorage` (`submitted_depts_<email>`), so repeat visits within the same browser tab skip the `/api/check-applications` round trip entirely. `FormComp.jsx`'s local draft autosave is a second, separate caching layer (localStorage, debounced) already covered in earlier rounds.
+- **Real gap found and closed:** `SubmissionsProvider` already exposed an `isLoadingSubmissions` flag for the in-flight (uncached) case, but nothing consumed it — the Departments page rendered every department card as immediately available, then could flip a card to "Already submitted" a moment later once the network check resolved. Fixed by having the Departments page render skeleton cards while `isLoadingSubmissions` is true (see Skeletons below), so the flash-then-correct behavior is gone.
+- **Real gap found and closed:** the admin dashboard's data was only ever available via the initial server-render — there was no client-side re-fetch path in use, so `/api/admin/applicants` existed, was correctly auth-gated, and was never called by anything. The only way to get fresher data was `window.location.reload()` (see below).
+
+**Skeleton loaders — added where a real loading state existed but only showed a bare spinner or nothing:**
+- Departments page: skeleton department cards while `isLoadingSubmissions` is true (see Caching above).
+- Admin dashboard (`AdminContent.jsx`): the `isPending` auth-hydration state now renders a skeleton table shape instead of a single spinner icon.
+- Admin dashboard, data refresh: refreshing the applicant list (see below) now shows skeleton rows in place of the table body instead of a spinner-only button state.
+- New primitive added: `components/ui/skeleton.jsx` (standard shadcn pattern — a single `animate-pulse` styled div), no new dependency required.
+
+**Optimistic rendering — implemented for the shortlist toggle, which also fixed a real state-desync bug found while wiring it up:**
+- Toggling "Shortlist"/"Unshortlist" (both in the main table and inside the "View Responses" dialog) now flips the row's state immediately and rolls back with a toast if the server actually rejects the request, instead of waiting on the network round trip before showing anything.
+- **Bug found and fixed along the way:** the "View Responses" dialog (`DialogComp.jsx`/`CarouselComp.jsx`) kept its own separate `shortlistStatus` array, entirely disconnected from the main table's data. Toggling shortlist status from inside that dialog updated only the dialog's own local copy — closing the dialog and looking at the main table would show the applicant's *old* shortlisted status until a full page reload. Fixed by removing that duplicated state entirely: both views now share DataTable's single `handleShortlist` function and read `shortlisted` directly off the same underlying record, so they can no longer disagree.
+- **A second bug surfaced by this refactor, fixed in the same pass:** the table's filter logic previously tracked "is a department/shortlisted filter active" by comparing array references (`deptFiltered !== data`). That's fragile by construction — it only works as long as the underlying data array itself never legitimately changes for any other reason. Adding optimistic updates (which necessarily replace that array) would have made this comparison misfire, silently reverting the table to stale filtered data any time a shortlist was toggled. Replaced with explicit filter-value state and a `useMemo`-derived table view, which has no such failure mode.
+
+**"Reset Filters" was doing a full page reload just to clear filters — replaced with an instant, local action, and reactivated the dead refresh endpoint:**
+- `window.location.reload()` is gone. "Reset Filters" now clears the search box, department filter, and shortlisted filter purely in React state — instant, no network round trip, no lost scroll position.
+- A separate new "Refresh" button now calls the previously-unused `/api/admin/applicants` route to pull a fresh applicant list without reloading the page, showing skeleton rows while in flight (see above).
+- **Bug found and fixed in the same pass:** `FilterDepartment`/`FilterShortlisted` each keep their own internal "currently selected" label state, which only ever got cleared as a side effect of the old full-page reload wiping *everything*. Once Reset Filters became a lightweight in-page action, clicking it would clear the actual filtering but leave the dropdown buttons still displaying the old selected label — a real, newly-exposed inconsistency. Fixed by passing a `resetKey` down to both components that they watch to clear their own displayed state.
+
+**Tooltips — added a real primitive and applied it to the controls that had no visible label:**
+- New primitives: `components/ui/tooltip.jsx` (standard shadcn/Radix pattern) and the `@radix-ui/react-tooltip` dependency (matching the version scheme of every other `@radix-ui/*` package already in this project); `TooltipProvider` wraps the app once in `app/layout.js`.
+- Applied to: the theme toggle button (icon-only, previously only had a screen-reader-only label with no visible hint on hover), the user avatar/account menu trigger (now also surfaces the signed-in user's name/email on hover), and the admin dashboard's Reset Filters / Refresh / Download CSV buttons (clarifying exactly what each does, since "Refresh" and "Reset Filters" now do two genuinely different things instead of one button doing both via a reload).
+
+## 13. Recommended next improvements (post-deadline, prioritized)
 
 **Security**
 1. **Upgrade Next.js 14 → 15.5.21+ and Tiptap 2 → 3.31.3+** (see §10) — both are breaking-change migrations deferred under deadline time pressure, not gaps that were missed. Budget a dedicated testing window (full regression pass on forms, admin dashboard, theming) before attempting either.

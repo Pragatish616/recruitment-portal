@@ -9,9 +9,10 @@ A recruitment portal built for a Google Developer Group (GDG) chapter to run its
 - **Department discovery** — browse open departments grouped as Technical / Non-Technical, each with a short description and an accent color/icon.
 - **Applications** — sign in, pick up to 2 departments, and fill one form per selection. A shared "why do you want to join" question is asked once; department-specific questions are asked per pick. Answers autosave as a local draft (debounced) so a refresh or dropped connection doesn't lose progress.
 - **Duplicate/limit protection** — a user can't submit the same department twice or exceed 2 applications, enforced atomically server-side (not just in the UI).
-- **Admin dashboard** — sortable/filterable/searchable applicant table, per-applicant response viewer, shortlist toggling, CSV export, and bulk "send email to selected applicants" with a rich-text composer and template support.
+- **Admin dashboard** — sortable/filterable/searchable applicant table, per-applicant response viewer, shortlist toggling (optimistic — flips instantly, rolls back with a toast if the server rejects it), a one-click data refresh that doesn't reload the page, CSV export, and bulk "send email to selected applicants" with a rich-text composer and template support.
 - **Countdown** — a live "applications close in" timer driven by a single configurable deadline.
 - **Light/dark theme**, accessible focus states, `prefers-reduced-motion`-aware animations throughout.
+- **Polished loading states** — skeleton placeholders (not bare spinners) wherever content is genuinely in flight — department cards while checking what you've already applied to, the admin table on first auth check and on manual refresh — plus tooltips on every icon-only or ambiguous control.
 
 ## Tech stack
 
@@ -33,6 +34,8 @@ A few decisions worth calling out for anyone reviewing this codebase:
 - **O(1) lookups instead of collection queries.** Application documents use a deterministic id (`slug(email)__slug(department)`), plus a small per-user index document (`applicants/{emailHash}`) that tracks which departments a user has already applied to. This turns "has this user already applied here" / "how many departments has this user applied to" into single `doc.get()` reads instead of `where()` queries, avoids needing a composite Firestore index, and — written transactionally alongside the application doc — closes a read-then-write race that could otherwise let two concurrent submits both slip past the "not already submitted" check.
 - **Code-split heavy client bundles.** The rich-text email composer (Tiptap + 5 extension packages) and the WebGL background effect are both loaded via `next/dynamic`, so their weight is only paid by the admin dashboard and homepage respectively, not shipped to every route.
 - **Deadline as config, not code.** The application deadline is a single constant, overridable via `NEXT_PUBLIC_APPLICATION_DEADLINE`, read by both the countdown UI and the `submit-form` API route's own deadline check — extending an intake window is an env var change, not a redeploy of logic.
+- **A user's own submitted-departments status is cached client-side** (`sessionStorage`, per signed-in email) so returning to the departments/application pages within the same session doesn't re-hit `/api/check-applications` every time; a genuine cache miss shows skeleton department cards rather than a flash of "available" that then flips to "already submitted."
+- **Admin table state is a single source of truth.** The applicant table, the "View Responses" dialog's shortlist toggle, and a manual data refresh all read and write the same in-memory list rather than each keeping their own copy — so shortlisting from either view is instantly reflected in both, with no chance of the two disagreeing until a page reload.
 
 ## Project structure
 

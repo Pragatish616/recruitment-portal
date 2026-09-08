@@ -3,7 +3,8 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
-import { Loader2, ShieldAlert } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ShieldAlert } from "lucide-react";
 import DataTable from "./DataTable";
 
 // The server (app/(pages)/admin/page.jsx) already refuses to fetch or send
@@ -16,8 +17,29 @@ const AdminContent = ({ applicants, isAuthorized, hasSession }) => {
 
   if (isPending) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+      <div className="mx-auto max-w-[1600px] px-4 py-8 sm:px-6">
+        <Skeleton className="mb-6 h-8 w-40" />
+        <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3 shadow-sm">
+          <div className="flex flex-wrap items-center gap-3 px-2 pt-1">
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <div className="flex items-start gap-3 p-1">
+            <Skeleton className="h-10 w-[300px]" />
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-40" />
+          </div>
+          <div className="rounded-md border border-border">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 border-b border-border p-3 last:border-b-0">
+                <Skeleton className="h-4 w-4 shrink-0" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-40 hidden sm:block" />
+                <Skeleton className="h-4 flex-1" />
+                <Skeleton className="h-8 w-24 shrink-0" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

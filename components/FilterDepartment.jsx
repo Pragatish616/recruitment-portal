@@ -37,9 +37,13 @@ frameworks.push({
     label: "Video Editing",
 });
 
-export default function FilterDepartment({ filterFunc }) {
+export default function FilterDepartment({ filterFunc, resetKey }) {
     const [open, setOpen] = React.useState(false);
     const [value, setValue] = React.useState("");
+
+    React.useEffect(() => {
+        if (resetKey !== undefined) setValue("");
+    }, [resetKey]);
 
     return (
         <Popover open={open} onOpenChange={setOpen}>

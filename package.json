@@ -26,6 +26,7 @@
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-switch": "^1.1.0",
     "@radix-ui/react-toast": "^1.2.1",
+    "@radix-ui/react-tooltip": "^1.2.16",
     "@tiptap/extension-blockquote": "^2.7.4",
     "@tiptap/extension-bullet-list": "^2.7.4",
     "@tiptap/extension-heading": "^2.7.4",
