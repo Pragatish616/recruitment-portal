@@ -2,6 +2,23 @@
 
 This document explains, end to end, what this project is, what was broken, what was fixed, why each fix was made the way it was, and what production-readiness looks like today. It is written for a technical reviewer (mentor) evaluating the submission.
 
+## Executive summary
+
+This started as a deliberately broken baseline — a data-loss bug plus a fully open database with zero admin auth, both fixed in §3. From there it went through four hardening passes: a manual security audit that found and closed two more real bugs (§6), a dependency/CVE triage that fixed what could be safely fixed and *explained* why the rest is deferred rather than either ignoring it or risking an untested major upgrade before judging (§10), a functional-correctness pass that found and fixed four independent, previously-invisible bugs across the mail composer, the registration form, and the admin dashboard (§11), and a UX pass adding optimistic updates, caching, skeleton loading states, and tooltips — which itself surfaced and fixed a real data-desync bug between two admin views (§12). Every fix in this document was verified against an actual `next build` (and where possible, a live route sweep) before being committed — nothing here is an unverified claim.
+
+## Under the hood: work a quick click-through won't surface
+
+A short demo click-through will show the UI working, but several of the most consequential fixes are invisible unless you go looking for them specifically:
+
+- **The database was fully open to the internet with zero admin authentication** before this pass — anyone could read or write every applicant's PII directly via the Firestore API, bypassing the app entirely, and the admin API routes shipped all applicant data to the browser *before* checking who was asking. Both closed in §3. This was the assignment's hidden bug, and it's the single highest-severity thing in this document.
+- **Shortlisting an applicant from the "View Responses" dialog silently failed to update the main table** until a full page reload — the two views kept separate copies of the same state. Fixed by making both read/write one shared, optimistic source of truth (§12). You'd only notice the original bug by shortlisting from the dialog, closing it, and comparing against the table.
+- **The "Send Mail" button was clickable but inert** before the "Verify Mail" step — no error, no toast, just silence, which reads exactly like a broken feature (§11). Now genuinely disabled until verified, and verification itself requires a subject line.
+- **Server-side validation exists independently of the UI** for every required application field (name, registration number, phone, the "why join" answer) and the department itself — a request built directly against the API, bypassing the form entirely, is rejected the same as a bad UI submission (§6, §10). None of this is visible unless you try to bypass the form.
+- **Bulk email HTML-escapes applicant-supplied data** before templating it into outbound messages, so a malicious value typed into an application's Name field at submission time can't inject markup into emails sent to other applicants later (§10) — a stored-injection path that would never surface in normal use.
+- **`Content-Security-Policy`, `Strict-Transport-Security`, and tightened auth rate-limiting** are live on every response (§10) — only visible via browser dev tools or a security scanner, not by using the site.
+- **A previously-dead, already-correctly-authenticated API route was reactivated** to power a real "Refresh" button, replacing a full `window.location.reload()` that used to be the only way to see fresh admin data (§12).
+- **Firestore writes are transactional with deterministic, SHA-256-hashed document IDs**, closing both a duplicate-submission race condition and an email-collision bug, and turning "has this user already applied" into an O(1) read instead of a collection query (§5, §6) — a cost/scale decision no amount of clicking around would reveal.
+
 ## 1. What this is
 
 A Next.js 14 (App Router) recruitment portal for a Google Developer Group chapter's yearly member intake: department discovery → application forms → admin review/shortlisting/email. Auth via `better-auth` (email/password + Google OAuth), data in Firestore via `firebase-admin` (server-only), UI in Tailwind + shadcn/ui.
