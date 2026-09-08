@@ -75,9 +75,8 @@ export default function MailComposer({ recipients, handleRowSelection }) {
             }),
         ],
         content: "",
-        onUpdate: () => {
-            setPayloadData( (prev) => ({ ...payloadData, body: editor.getHTML() }));
-            
+        onUpdate: ({ editor }) => {
+            setPayloadData((prev) => ({ ...prev, body: editor.getHTML() }));
         },
         editorProps: {
             attributes: {
@@ -109,11 +108,12 @@ export default function MailComposer({ recipients, handleRowSelection }) {
                                 <Input
                                     className="max-w-[73vw]"
                                     placeholder="Subject"
+                                    value={payloadData.subject}
                                     onChange={(e) =>
-                                        setPayloadData({
-                                            ...payloadData,
+                                        setPayloadData((prev) => ({
+                                            ...prev,
                                             subject: e.target.value,
-                                        })
+                                        }))
                                     }
                                 />
                                 {/* Select Template */}
@@ -121,13 +121,17 @@ export default function MailComposer({ recipients, handleRowSelection }) {
                                     onValueChange={(value) => {
                                         switch (value) {
                                             case "Blank":
+                                                setPayloadData((prev) => ({
+                                                    ...prev,
+                                                    mailType: value,
+                                                }));
                                                 editor.commands.setContent("");
                                                 break;
                                             case "Interview Invite":
-                                                setPayloadData({
-                                                    ...payloadData,
+                                                setPayloadData((prev) => ({
+                                                    ...prev,
                                                     mailType: value,
-                                                });
+                                                }));
                                                 editor.commands.setContent(
                                                     mailingTemplate.Interview
                                                 );

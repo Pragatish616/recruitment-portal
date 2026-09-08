@@ -112,7 +112,22 @@ A second, deeper pass beyond §6, run right before the submission deadline: a fu
   - **`postcss`** — bundled *inside* Next's own `node_modules`, gets fixed automatically as part of the Next 15 upgrade above; not a standalone dependency this repo controls.
   - **`uuid`** (moderate, no fix published) and the **`glob` CLI** command-injection advisory (high) — both real advisories, but neither is reachable through this app's code: `uuid` is three levels deep in `firebase-admin → @google-cloud/storage`, a Cloud Storage client this app never calls (it only uses Firestore); the `glob` CVE is specifically about invoking `glob`'s own CLI with `-c`/`--cmd`, which nothing in this app's runtime path does (it's a transitive build-tool dependency). Accepted as residual risk with no practical exposure.
 
-## 11. Recommended next improvements (post-deadline, prioritized)
+## 11. Round 3: functional fixes, data-integrity verification, and branding (2026-09-08)
+
+**Bugs found and fixed:**
+- **Registration number silently rejected valid-looking input.** The field's `uppercase` class in `FormComp.jsx` is CSS `text-transform` — purely visual. Typing a registration number in lowercase displayed correctly (e.g. `25bce5612` rendered as `25BCE5612` on screen) but the actual submitted value stayed lowercase, failing the uppercase-only format regex on both client and server with no visible reason why. Fixed by uppercasing the real field value on change, not just its display.
+- **Mail composer could silently drop the Subject/template selection.** `MailComposer.jsx`'s `onUpdate` handler for the rich-text body editor declared a `(prev) => ...` functional state updater but then ignored `prev` and spread the outer-scope `payloadData` closure variable instead — a stale-state bug. Depending on React's render/batch timing, editing the email body after setting a Subject (or picking a template) could silently reset those fields back to empty before the email actually sent, with no visual sign anything was wrong since the Subject input wasn't even bound to state (`value` was unset — a second, compounding bug, also fixed). Both are fixed now: the Subject input is properly controlled, and all three `payloadData` updates (Subject, template selection, editor body) use the functional `(prev) => ({...prev, ...})` form consistently.
+
+**Data-integrity verification (requested: confirm every response — including links — is actually stored and shown in full):** traced the full path end to end and found no truncation anywhere:
+- `/api/submit-form` writes the entire client-submitted `Questions` object to Firestore untouched (`Questions: Questions || {}`) — no field filtering, no length limits, no character restrictions on the per-department question schemas (`z.string().optional()`, no regex).
+- `serializeFirestoreData` (`lib/db.ts`), used by the admin applicants API, recursively serializes every field (handling nested objects/arrays/Firestore Timestamps) with no data dropped or shortened.
+- The admin response viewer (`CarouselComp.jsx`) renders every question/answer pair in full inside a scrollable container — nothing is cut off or ellipsized. While verifying this, two display-only gaps (not data loss — the underlying stored data was always complete) were fixed: multi-line answers weren't preserving line breaks visually (`whitespace-pre-wrap` added), and links rendered as inert plain text instead of being clickable (added a small regex-based linkifier — splits on `https?://` matches and renders real `<a>` elements, never raw HTML, so there's no injection surface).
+- CSV export (`formatQuestionsForCsv` in `DataTable.jsx`) flattens every question/answer into the export row with nothing omitted.
+- Grepped the entire submit → store → serialize → display/export pipeline for `.substring(`/`.slice(0`/`.substr(` — none found. Applicant answers, including links and long-form text, are stored and displayed completely.
+
+**Branding:** replaced the placeholder "R" letter mark in the navbar (`NavBar.jsx`) with the actual organization logo (`public/assets/gdg-logo.png`), rendered via `next/image` (auto-optimized, served at 28×28 — verified locally that the optimized endpoint returns a valid ~3KB PNG and every route still renders correctly under it).
+
+## 12. Recommended next improvements (post-deadline, prioritized)
 
 **Security**
 1. **Upgrade Next.js 14 → 15.5.21+ and Tiptap 2 → 3.31.3+** (see §10) — both are breaking-change migrations deferred under deadline time pressure, not gaps that were missed. Budget a dedicated testing window (full regression pass on forms, admin dashboard, theming) before attempting either.

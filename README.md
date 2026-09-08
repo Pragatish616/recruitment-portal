@@ -88,4 +88,8 @@ The app is deployed on [Vercel](https://vercel.com). To redeploy your own copy:
 
 - Firestore has no public read/write surface — see `firestore.rules` and the architecture notes above.
 - Applicant PII (name, email, registration number, phone, question answers) is never fetched unless the request is server-verified as an admin session.
-- Registration numbers and phone numbers are format-validated server-side, not just in the form.
+- Every application field (name, registration number, phone, the "why join" answer, department) is required and format-validated server-side in `/api/submit-form` — not just in the client form, so a request built directly against the API can't create incomplete or spoofed records.
+- Bulk email (`/api/send-email`, admin-only) HTML-escapes applicant-supplied fields before templating them into outbound email, so an applicant can't plant markup in their own application data and have it render in emails sent to other people.
+- `Content-Security-Policy` and `Strict-Transport-Security` headers are set alongside `X-Frame-Options`/`X-Content-Type-Options`/`Referrer-Policy`/`Permissions-Policy` (see `next.config.mjs`).
+- Sign-in/sign-up are rate-limited (5 requests/60s per IP) on top of better-auth's own default rate limiting, for brute-force resistance.
+- See `work.md` for the full security audit history, including dependency-CVE triage and what's deliberately deferred (with reasoning) vs. fixed.

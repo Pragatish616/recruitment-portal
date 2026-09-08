@@ -12,6 +12,33 @@ import {
 import { Separator } from "./ui/separator";
 import { Button } from "@/components/ui/button";
 
+// Answers are stored and rendered in full already (verified end to end —
+// nothing is truncated); this only makes a stored link actually clickable
+// instead of inert plain text. Regex requires an explicit http(s):// prefix,
+// so this can't produce a javascript: URI, and results render as real React
+// elements (never raw HTML), so there's no injection surface here.
+const URL_PATTERN = /(https?:\/\/[^\s<>"]+)/g;
+const IS_URL = /^https?:\/\//;
+
+const linkifyText = (text) => {
+    const str = String(text);
+    return str.split(URL_PATTERN).map((part, i) =>
+        IS_URL.test(part) ? (
+            <a
+                key={i}
+                href={part}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="break-all text-primary underline underline-offset-2 hover:opacity-80"
+            >
+                {part}
+            </a>
+        ) : (
+            <span key={i}>{part}</span>
+        )
+    );
+};
+
 export default function CarouselComp({
     dataList,
     handleShortlist,
@@ -65,8 +92,10 @@ export default function CarouselComp({
                                                                 {qIndex + 1}. {question}{" "}
                                                             </h1>
                                                             <Separator />
-                                                            <p className="mt-1 font-normal opacity-[70%]">
-                                                                {displayAnswer}
+                                                            <p className="mt-1 whitespace-pre-wrap break-words font-normal opacity-[70%]">
+                                                                {typeof displayAnswer === "string"
+                                                                    ? linkifyText(displayAnswer)
+                                                                    : displayAnswer}
                                                             </p>
                                                         </div>
                                                     );

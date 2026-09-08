@@ -1,6 +1,7 @@
 "use client";
 import React, { useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import UserButton from "./UserButton";
 import { Button } from "./ui/button";
 import ThemeToggle from "./ThemeToggle";
@@ -31,12 +32,15 @@ const NavBar = () => {
           href="/"
           className="flex shrink-0 items-center gap-2 text-base font-semibold tracking-tight"
         >
-          <span
-            className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-sm font-bold text-primary-foreground"
+          <Image
+            src="/assets/gdg-logo.png"
+            alt=""
             aria-hidden="true"
-          >
-            R
-          </span>
+            width={28}
+            height={28}
+            priority
+            className="h-7 w-7 shrink-0 rounded-md object-contain"
+          />
           <span className="hidden font-heading sm:inline">Recruitment Portal</span>
         </Link>
 
