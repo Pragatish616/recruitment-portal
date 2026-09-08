@@ -75,7 +75,7 @@ See `.env.example` for the full list with descriptions. At minimum you need:
 - A Firebase project with Firestore enabled, plus a service account (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`) — or point `FIRESTORE_EMULATOR_HOST` at a local emulator for development without touching production data.
 - `BETTER_AUTH_SECRET` (any random 32+ char string locally) and `BETTER_AUTH_URL`.
 - A Google OAuth client (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`) if you want Google sign-in.
-- `EMAIL_USERNAME` / `EMAIL_PASSWORD` (a Gmail app password) if you want the admin bulk-email feature to actually send.
+- `EMAIL_USERNAME` / `EMAIL_PASSWORD` (a Gmail app password) — powers both the admin bulk-email feature and, now, email/password sign-up verification (`lib/mailer.js`). Without it, new email/password accounts can be created but can never be verified or signed into (Google sign-in is unaffected).
 - `NEXT_PUBLIC_APPLICATION_DEADLINE` — an ISO 8601 datetime; falls back to a placeholder future date if unset.
 
 ## Deploying
@@ -95,4 +95,5 @@ The app is deployed on [Vercel](https://vercel.com). To redeploy your own copy:
 - Bulk email (`/api/send-email`, admin-only) HTML-escapes applicant-supplied fields before templating them into outbound email, so an applicant can't plant markup in their own application data and have it render in emails sent to other people.
 - `Content-Security-Policy` and `Strict-Transport-Security` headers are set alongside `X-Frame-Options`/`X-Content-Type-Options`/`Referrer-Policy`/`Permissions-Policy` (see `next.config.mjs`).
 - Sign-in/sign-up are rate-limited (5 requests/60s per IP) on top of better-auth's own default rate limiting, for brute-force resistance.
+- Email/password sign-up requires verifying the address before the account is usable (`emailAndPassword.requireEmailVerification` + `autoSignIn: false` in `lib/auth.js`) — closes an identity-spoofing gap where anyone could otherwise apply under an email address they don't control. Google sign-in is unaffected (already provider-verified).
 - See `work.md` for the full security audit history, including dependency-CVE triage and what's deliberately deferred (with reasoning) vs. fixed.

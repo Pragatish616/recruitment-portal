@@ -61,6 +61,13 @@ export default function SignInPage() {
 
       if (res?.error) {
         toast.error(res.error.message || "Authentication failed.");
+      } else if (mode === "signup" && !res?.data?.token) {
+        // Sign-up succeeds but no session is issued until the email is
+        // verified (autoSignIn is disabled for unverified accounts) - the
+        // verification link was just emailed automatically.
+        toast.success("Account created! Check your email to verify it before signing in.");
+        setMode("signin");
+        setPassword("");
       } else {
         toast.success(mode === "signup" ? "Account created successfully!" : "Signed in successfully!");
         router.push("/");

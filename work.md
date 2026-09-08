@@ -179,7 +179,28 @@ The user asked for these four UX/perf patterns to be audited across the app and 
 - New primitives: `components/ui/tooltip.jsx` (standard shadcn/Radix pattern) and the `@radix-ui/react-tooltip` dependency (matching the version scheme of every other `@radix-ui/*` package already in this project); `TooltipProvider` wraps the app once in `app/layout.js`.
 - Applied to: the theme toggle button (icon-only, previously only had a screen-reader-only label with no visible hint on hover), the user avatar/account menu trigger (now also surfaces the signed-in user's name/email on hover), and the admin dashboard's Reset Filters / Refresh / Download CSV buttons (clarifying exactly what each does, since "Refresh" and "Reset Filters" now do two genuinely different things instead of one button doing both via a reload).
 
-## 13. Recommended next improvements (post-deadline, prioritized)
+## 13. Round 5: read-only security audit + email verification (2026-09-08)
+
+A fresh, independent read-only pass (no code changed) focused on areas the earlier rounds hadn't specifically targeted: IDOR checks on every self-scoped route, better-auth's own privilege-escalation and account-linking internals (verified against the library's own source, not assumed), and the two most recently-added admin routes.
+
+**Held up clean, verified (not assumed):** IDOR checks are consistent across `check-applications`/`check-department-submission`/`get-submissions` (all require `email === session.user.email`). CSRF exposure on state-changing routes is mitigated by better-auth's `sameSite: "lax"` session cookie default. Better-auth's own admin-role-escalation endpoints (`/admin/set-role` etc.) independently re-check the caller's *current* role server-side, so a regular user can't call better-auth's own API to self-promote. No `dangerouslySetInnerHTML`, no `eval`, no leaked secrets, no exposed production source maps.
+
+**Findings, and what was done about each:**
+1. **No email verification on email/password sign-up — fixed this round.** Anyone could previously sign up using someone else's real email address without proving ownership, then submit an application under that identity. Traced the follow-on risk (could this let an attacker later hijack the real owner's account via Google sign-in on the same email?) and confirmed better-auth's own default (`requireLocalEmailVerified: true`) already blocks that specific escalation — so this was never a full account-takeover path, but the identity-spoofing gap on application content itself was real. See below for the fix.
+2. **No maximum length on free-text fields** (`Name`, per-department question answers) — validated for presence, not length. Bounded in practice by the existing 2-applications-per-account cap and sign-up rate limiting, so low severity, but a real gap if judged specifically against this project's "storage-cost" angle. Not fixed this round (flagged, not blocking).
+3. **`/api/shortlist/[id]` calls `docRef.update()` before checking `snapshot.exists`** — Firestore's `update()` throws on a nonexistent document, so the intended `404` branch can never execute; a bad id falls into the generic catch block instead, returning a raw Firestore error string. Admin-only, so no security exposure, but a real dead-code/wrong-status-code bug. Not fixed this round (flagged, not blocking).
+4. **Same route: no type-checking on the `shortlisted` body field** before writing it to Firestore. Admin-trust-boundary only. Not fixed this round (flagged, not blocking).
+5. **Minor internal-detail leakage** in a couple of error strings (e.g. mentioning an internal folder name) — cosmetic, not exploitable.
+
+**Email verification — implemented in this round, closing finding #1:**
+- New `lib/mailer.js`: a small, independent Nodemailer transporter reusing the *same already-configured* Gmail App Password (`EMAIL_USERNAME`/`EMAIL_PASSWORD`) the bulk-email feature already uses — no new credentials required. Kept separate from `app/api/send-email/route.js`'s own transporter so a change to one can't regress the already-tested-working other.
+- `lib/auth.js`: added `emailAndPassword.requireEmailVerification: true` and, critically, `emailAndPassword.autoSignIn: false`. The second flag is not optional decoration — traced better-auth's actual sign-up handler and confirmed that without disabling auto sign-in, a brand-new unverified account still gets a fully usable session immediately after sign-up regardless of `requireEmailVerification`; that flag alone only gates a *later, separate* sign-in attempt. Disabling auto sign-in is what actually closes the gap for the realistic attack path (sign up as someone else, immediately use the session in the same request).
+- Confirmed via better-auth's own source that `/api/auth/verify-email` is already handled by the existing `app/api/auth/[...all]` catch-all route (a GET endpoint that validates the token server-side and redirects) — no new page needed.
+- `app/auth/signin/page.jsx`: updated the post-sign-up handler to detect the new no-session-yet state (`res.data.token` is null when unverified) and show a "check your email to verify" message instead of assuming immediate login and redirecting as if signed in.
+- Google OAuth sign-in is unaffected — Google-authenticated emails are already provider-verified and don't go through this check.
+- **Operational note, not a code gap:** this only affects future sign-in attempts. Anyone with an already-active session (including the admin's own, and the throwaway test accounts already in the database from earlier testing) keeps working uninterrupted — the verification check only runs at sign-in/sign-up time, not on every request. The next time any *existing* pre-this-change account needs to sign in fresh, they'll get a "check your email" prompt with an automatically-sent verification link to their own real inbox (self-service, not a lockout) — this includes the admin account itself, so be aware the next fresh sign-in will require clicking that link once.
+
+## 14. Recommended next improvements (post-deadline, prioritized)
 
 **Security**
 1. **Upgrade Next.js 14 → 15.5.21+ and Tiptap 2 → 3.31.3+** (see §10) — both are breaking-change migrations deferred under deadline time pressure, not gaps that were missed. Budget a dedicated testing window (full regression pass on forms, admin dashboard, theming) before attempting either.
@@ -187,12 +208,14 @@ The user asked for these four UX/perf patterns to be audited across the app and 
 3. Rotate/verify the Firebase Admin service account key is stored only in Vercel's encrypted env vars, never committed (confirm `.env.local` stays gitignored — it currently points at a throwaway test project, not prod).
 4. Add automated dependency scanning (`npm audit` / Dependabot / Snyk) in CI given the number of third-party Radix/Tiptap packages, so the next round of CVEs surfaces automatically instead of via a manual pass.
 5. Consider a persistent-storage rate limiter (e.g. Upstash Redis) for `/api/submit-form` if abuse becomes a real problem — the route is already auth-gated and hard-capped at 2 applications/user for free, and better-auth's own rate limiter now covers sign-in/sign-up (§10), so this is a "if needed" item, not a gap in current protection.
+6. Add a max-length check on free-text fields (`Name`, per-department question answers) server-side in `/api/submit-form` — currently validated for presence, not length (§13, finding #2). Bounded today by the 2-applications-per-account cap and sign-up rate limiting, so not urgent, but a real gap if this is judged specifically against the storage-cost angle.
 
 **Backend**
 1. Add structured server-side logging (submission events, admin actions, email sends) for audit trail — currently no persistent log beyond Vercel's ephemeral runtime logs.
 2. Add a Firestore composite backup/export schedule (Firestore has no built-in point-in-time recovery by default) — one bad admin action currently has no undo path.
 3. Consider moving bulk email sending (`/api/send-email`) to a queue (e.g. Vercel Cron + a job table, or a proper queue service) if applicant volume grows — currently synchronous, so a large batch risks hitting serverless function timeout.
 4. Run the doc-ID migration (§8) once production credentials are available, then delete the script.
+5. Fix `/api/shortlist/[id]`'s dead 404 branch and add type-checking on the `shortlisted` body field (§13, findings #3-4) — admin-only, so low severity, but worth cleaning up: it calls Firestore's `update()` (which throws on a nonexistent doc) before its own `snapshot.exists` check, so that check can never actually run.
 
 **Features**
 1. Applicant-facing status page (e.g. "under review" / "shortlisted" / "not selected") — currently applicants have no visibility after submitting beyond seeing their own submitted answers.
