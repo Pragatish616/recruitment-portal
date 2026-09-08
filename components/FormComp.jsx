@@ -362,7 +362,15 @@ const FormComp = ({ dept1, dept2, isLoading, setIsLoading }) => {
                 name="RegistrationNumber"
                 render={({ field, fieldState }) => (
                   <FieldShell label="Registration number" error={fieldState.error}>
-                    <Input {...field} placeholder="25BCE5612" className="uppercase" />
+                    {/* The visible "uppercase" class only styles the text — it doesn't
+                        change the actual value, so typing lowercase looked correct on
+                        screen but still failed the uppercase-only format regex below. */}
+                    <Input
+                      {...field}
+                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                      placeholder="25BCE5612"
+                      className="uppercase"
+                    />
                   </FieldShell>
                 )}
               />
