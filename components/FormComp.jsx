@@ -23,14 +23,12 @@ import {
   SelectValue,
 } from "./ui/select";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { QuestionnaireData } from "@/constants";
+import { QuestionnaireData, JOIN_QUESTION } from "@/constants";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
 import { useSubmissions } from "@/components/SubmissionsProvider";
 import { cn } from "@/lib/utils";
-
-const JOIN_QUESTION = "Why do you want to join Organization Name?";
 
 const normaliseQuestion = (question) =>
   typeof question === "string"

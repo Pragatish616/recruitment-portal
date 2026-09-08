@@ -23,6 +23,11 @@ import {
 export const APPLICATION_DEADLINE =
   process.env.NEXT_PUBLIC_APPLICATION_DEADLINE || "2026-12-31T23:59:59+05:30";
 
+// Single source of truth for the shared "why join" question key, used to
+// read/write the same Questions map entry from FormComp (client) and
+// submit-form (server validation) without risking the two copies drifting.
+export const JOIN_QUESTION = "Why do you want to join Organization Name?";
+
 export const curDay = new Date().getDay();
 export const curYear = new Date().getFullYear();
 export const curDate = new Date().getDate();

@@ -29,12 +29,27 @@ const resolveDeptName = (recipientDepartment) => {
     return deptName;
 };
 
+// recipient.Name is applicant-supplied (from their application form), not
+// admin-authored — interpolating it unescaped into an HTML email would let
+// an applicant plant markup/script in their own Name field that later
+// executes or renders in every recipient's inbox once an admin sends a
+// templated email using #name. payloadData.body/subject are admin-authored
+// (the rich-text composer's own output) and intentionally left as HTML.
+const escapeHtml = (str) =>
+    String(str).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+    }[c]));
+
 const sendOne = async (recipient, payloadData) => {
     const deptName = resolveDeptName(recipient.Department);
 
     let generalTemp = `<div>${payloadData.body}</div>`;
-    generalTemp = generalTemp.replace(/#name/g, recipient.Name || "");
-    generalTemp = generalTemp.replace(/#dept/g, deptName);
+    generalTemp = generalTemp.replace(/#name/g, escapeHtml(recipient.Name || ""));
+    generalTemp = generalTemp.replace(/#dept/g, escapeHtml(deptName));
 
     await transporter.sendMail({
         from: process.env.EMAIL_USERNAME,

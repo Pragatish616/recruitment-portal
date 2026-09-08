@@ -2,7 +2,7 @@ import { connect, applicantIndexId, applicationDocId } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { FieldValue } from "firebase-admin/firestore";
-import { APPLICATION_DEADLINE, reviews } from "@/constants";
+import { APPLICATION_DEADLINE, reviews, JOIN_QUESTION } from "@/constants";
 
 const VALID_DEPARTMENTS = new Set(reviews.map((department) => department.name));
 
@@ -51,12 +51,40 @@ export async function POST(req) {
       );
     }
 
+    // The form (FormComp.jsx) marks Name/RegistrationNumber/Phone/the "why
+    // join" answer as required with a Zod schema, but that only stops the
+    // rendered UI from submitting incomplete data — a request built directly
+    // against this route (bypassing the form) previously sailed straight
+    // through with any of those blank or missing, same class of gap as the
+    // Department whitelist fix above. Enforced here too now.
+    if (!formFields.Name || typeof formFields.Name !== "string" || !formFields.Name.trim()) {
+      return new Response(
+        JSON.stringify({ message: "Name is required" }),
+        { status: 400 }
+      );
+    }
+
     const regNoRegex = /^\d{2}[A-Z]{3}\d{4}$/;
-    if (formFields.RegistrationNumber && !regNoRegex.test(formFields.RegistrationNumber)) {
+    if (!formFields.RegistrationNumber || !regNoRegex.test(formFields.RegistrationNumber)) {
       return new Response(
         JSON.stringify({
           message: "Registration number must be 2 numbers, 3 uppercase letters, and 4 numbers (e.g. 25BCE5612)",
         }),
+        { status: 400 }
+      );
+    }
+
+    const phoneRegex = /^\d{10}$/;
+    if (!formFields.Phone || !phoneRegex.test(formFields.Phone)) {
+      return new Response(
+        JSON.stringify({ message: "Enter a valid 10-digit phone number" }),
+        { status: 400 }
+      );
+    }
+
+    if (!Questions?.[JOIN_QUESTION] || !String(Questions[JOIN_QUESTION]).trim()) {
+      return new Response(
+        JSON.stringify({ message: `"${JOIN_QUESTION}" is required` }),
         { status: 400 }
       );
     }
