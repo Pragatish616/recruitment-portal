@@ -445,6 +445,7 @@ export default function MailComposer({ recipients, handleRowSelection }) {
                                 <div className="flex gap-1 items-center justify-center">
                                     <Button
                                         variant="outline"
+                                        disabled={!payloadData.subject.trim()}
                                         onClick={() => setConfirm(true)}
                                     >
                                         Verify Mail
@@ -461,12 +462,11 @@ export default function MailComposer({ recipients, handleRowSelection }) {
                                 </div>
                             )}
                             <Button
-                                type="submit"
+                                type="button"
+                                disabled={!confirm}
                                 onClick={() => {
-                                    if (confirm) {
-                                        handleRowSelection(payloadData);
-                                        setConfirm(false);
-                                    }
+                                    handleRowSelection(payloadData);
+                                    setConfirm(false);
                                 }}
                                 className={
                                     !confirm &&
