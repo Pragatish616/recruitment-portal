@@ -9,29 +9,47 @@ export async function PATCH(req, { params }) {
         return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 });
     }
 
-    const db = await connect();
-
     const { id } = params;
     const { shortlisted } = await req.json();
 
+    // Written by the client as a real boolean (!isShortlisted) today, but
+    // nothing enforced that server-side - a malformed body would previously
+    // be written to Firestore as-is (e.g. a non-empty string, which is
+    // truthy regardless of its value, silently breaking the shortlisted
+    // count/filter logic downstream).
+    if (typeof shortlisted !== 'boolean') {
+        return NextResponse.json({ success: false, message: 'shortlisted must be a boolean' }, { status: 400 });
+    }
+
+    const db = await connect();
+
     try {
         const docRef = db.collection('formData').doc(id);
-        await docRef.update({ shortlisted });
-        const snapshot = await docRef.get();
 
-        if (!snapshot.exists) {
+        // Checked before writing, not after: Firestore's update() throws on
+        // a nonexistent document, so the previous order (update, then check
+        // snapshot.exists) meant that check could never actually run - a bad
+        // id always fell into the catch block below instead of this 404.
+        const existing = await docRef.get();
+        if (!existing.exists) {
             return NextResponse.json({ success: false, message: 'Applicant not found' }, { status: 404 });
         }
 
+        await docRef.update({ shortlisted });
+
+        // Overlays the just-written value onto the doc read moments ago,
+        // rather than reading it back a second time - same one-read/one-
+        // write cost as before, just reordered.
         const applicant = {
-            id: snapshot.id,
-            _id: snapshot.id,
-            ...serializeFirestoreData(snapshot.data()),
+            id: existing.id,
+            _id: existing.id,
+            ...serializeFirestoreData(existing.data()),
+            shortlisted,
         };
 
         return NextResponse.json({ success: true, data: applicant });
     } catch (error) {
         console.error('Error updating applicant:', error.message);
-        return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+        return NextResponse.json({ success: false, message: 'Failed to update applicant' }, { status: 500 });
     }
 }
