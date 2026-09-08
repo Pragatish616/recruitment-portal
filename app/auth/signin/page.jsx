@@ -18,6 +18,13 @@ import RecruitmentLoader from "@/components/GDGLoader";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Mirrors the server-side rule enforced in lib/auth.js (the actual
+// enforcement point - this is only here for instant feedback before a
+// round trip). Existing accounts are never re-validated against this;
+// it only applies going forward, to new sign-ups.
+const PASSWORD_STRENGTH_REGEX = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+const PASSWORD_HINT = "At least 8 characters, with a letter, a number, and a special character.";
+
 export default function SignInPage() {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
@@ -46,6 +53,10 @@ export default function SignInPage() {
     }
     if (mode === "signup" && !name) {
       toast.error("Please enter your name.");
+      return;
+    }
+    if (mode === "signup" && !PASSWORD_STRENGTH_REGEX.test(password)) {
+      toast.error(PASSWORD_HINT);
       return;
     }
 
@@ -143,6 +154,9 @@ export default function SignInPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              {mode === "signup" && (
+                <p className="text-xs text-muted-foreground">{PASSWORD_HINT}</p>
+              )}
             </div>
 
             <Button type="submit" disabled={submitting} className="w-full gap-2">
